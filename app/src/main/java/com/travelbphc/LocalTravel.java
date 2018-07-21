@@ -44,6 +44,7 @@ public class LocalTravel extends Fragment implements View.OnClickListener {
         View rootView = inflater.inflate(R.layout.local_travel, container, false);
         try {
             //FROM
+            assert getActivity() != null;
             PlaceAutocompleteFragment fromField = (PlaceAutocompleteFragment) getActivity().getFragmentManager().findFragmentById(R.id.fromField);
             fromField.setOnPlaceSelectedListener(new PlaceSelectionListener() {
                 @Override
@@ -101,8 +102,8 @@ public class LocalTravel extends Fragment implements View.OnClickListener {
                         @Override
                         public void onDateSet(DatePicker view, int year,
                                               int monthOfYear, int dayOfMonth) {
-
-                            date.setText(dayOfMonth + "-" + (monthOfYear + 1) + "-" + year);
+                            String printDate = dayOfMonth + "-" + (monthOfYear + 1) + "-" + year;
+                            date.setText(printDate);
 
                         }
                     }, mYear, mMonth, mDay);
@@ -122,8 +123,8 @@ public class LocalTravel extends Fragment implements View.OnClickListener {
                         @Override
                         public void onTimeSet(TimePicker view, int hourOfDay,
                                               int minute) {
-
-                            time.setText(hourOfDay + ":" + minute);
+                            String printTime = hourOfDay + ":" + minute;
+                            time.setText(printTime);
                         }
                     }, mHour, mMinute, false);
             timePickerDialog.show();
