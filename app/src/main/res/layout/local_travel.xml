@@ -56,12 +56,28 @@
         android:text="time"
         android:textSize="17sp" />
 
+    <EditText
+        android:id="@+id/phoneNumber"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_below="@id/datePicker"
+        android:hint="Enter phone number here"
+        android:inputType="phone" />
+
     <Button
-        android:id="@+id/submit"
+        android:id="@+id/addToList"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_alignParentBottom="true"
         android:layout_centerHorizontal="true"
-        android:text="Submit" />
+        android:text="Add to list" />
+
+    <Button
+        android:id="@+id/getList"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_above="@id/addToList"
+        android:layout_centerHorizontal="true"
+        android:text="Get list" />
 
 </RelativeLayout>

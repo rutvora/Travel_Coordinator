@@ -10,6 +10,7 @@ import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.DatePicker;
+import android.widget.EditText;
 import android.widget.TextView;
 import android.widget.TimePicker;
 import android.widget.Toast;
@@ -78,7 +79,8 @@ public class LocalTravel extends Fragment implements View.OnClickListener {
             time = rootView.findViewById(R.id.timePicker);
             time.setOnClickListener(this);
 
-            rootView.findViewById(R.id.submit).setOnClickListener(this);
+            rootView.findViewById(R.id.addToList).setOnClickListener(this);
+            rootView.findViewById(R.id.getList).setOnClickListener(this);
         } catch (NullPointerException e) {
             Toast.makeText(getContext(), "Fragment Manager not found", Toast.LENGTH_SHORT).show();
         }
@@ -128,8 +130,9 @@ public class LocalTravel extends Fragment implements View.OnClickListener {
                         }
                     }, mHour, mMinute, false);
             timePickerDialog.show();
-        } else if (v.getId() == R.id.submit) {
-            Log.w("Here", "1");
+        } else if (v.getId() == R.id.addToList) {
+            assert getActivity() != null;
+            getActivity().findViewById(R.id.loadingIcon).setVisibility(View.VISIBLE);
             double fromLat, fromLong, toLat, toLong;
             LatLng from = this.from.getLatLng();
             LatLng to = this.to.getLatLng();
@@ -143,27 +146,51 @@ public class LocalTravel extends Fragment implements View.OnClickListener {
             String[] splitTime = time.split(":");
 
             Map<String, String> userInfo = new HashMap<>(3);
-            userInfo.put("Name", "Name1");
-            userInfo.put("Email", "Email1");
-            userInfo.put("Phone", "Phone1");
+            userInfo.put("Name", MainActivity.user.getDisplayName());
+            userInfo.put("Email", MainActivity.user.getEmail());
+            EditText phoneNumber = getActivity().findViewById(R.id.phoneNumber);
+            userInfo.put("Phone", phoneNumber.getText().toString());
 
             Map<String, Map<String, String>> toAdd = new HashMap<>(1);
-            toAdd.put("userID3", userInfo);
-            Log.w("Here", "2");
+            toAdd.put(MainActivity.user.getUid(), userInfo);
             MainActivity.weakDBReference.get().collection("BITS Hyderabad").document("Local")
                     .collection(collection).document(splitTime[0]).set(toAdd, SetOptions.merge()).addOnSuccessListener(new OnSuccessListener<Void>() {
                 @Override
                 public void onSuccess(Void aVoid) {
-                    Log.w("Success", "True");
+                    assert getActivity() != null;
+                    getActivity().findViewById(R.id.loadingIcon).setVisibility(View.GONE);
+                    Toast.makeText(getActivity(), "You have been added to the list", Toast.LENGTH_SHORT).show();
                 }
             }).addOnFailureListener(new OnFailureListener() {
                 @Override
                 public void onFailure(@NonNull Exception e) {
-                    Log.w("Failed", "Error");
+                    getActivity().findViewById(R.id.loadingIcon).setVisibility(View.GONE);
+                    Toast.makeText(getActivity(), "Error. Please try again", Toast.LENGTH_SHORT).show();
                     e.printStackTrace();
+
                 }
             });
-            Log.w("Here", "3");
+        } else if (v.getId() == R.id.getList) {
+            assert getActivity() != null;
+            double fromLat, fromLong, toLat, toLong;
+            LatLng from = this.from.getLatLng();
+            LatLng to = this.to.getLatLng();
+            fromLat = Math.round((from.latitude) * 100.0) / 100.0;
+            fromLong = Math.round((from.longitude) * 100.0) / 100.0;
+            toLat = Math.round((to.latitude) * 100.0) / 100.0;
+            toLong = Math.round((to.longitude) * 100.0) / 100.0;
+
+            String collection = "(" + fromLat + "," + fromLong + ")-(" + toLat + "," + toLong + ")";
+            String time = this.time.getText().toString();
+            String[] splitTime = time.split(":");
+
+            List list = new List();
+            Bundle bundle = new Bundle();
+            bundle.putString("location", "Local");
+            bundle.putString("collection", collection);
+            bundle.putString("document", splitTime[0]);
+            list.setArguments(bundle);
+            getActivity().getSupportFragmentManager().beginTransaction().replace(R.id.fragment, list).commit();
         } else {
             Log.w("Unknown id", v.getId() + "");
         }
