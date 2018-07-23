@@ -3,6 +3,23 @@
 
     <string name="navigation_drawer_open">Open navigation drawer</string>
     <string name="navigation_drawer_close">Close navigation drawer</string>
-    <string name="hosted_domain">hyderabad.bits-pilani.ac.in</string>
+    <string name="domain">hyderabad.bits-pilani.ac.in</string>
     <string name="action_settings">Settings</string>
+    <string name="localOrOutstation">localOrOutstation</string>
+    <string name="fromTo">fromTo</string>
+    <string name="dateOfJourney">dateOfJourney</string>
+    <string name="queryCondition">queryCondition</string>
+    <string name="name">name</string>
+    <string name="email">email</string>
+    <string name="phone">phone</string>
+    <string name="time">time</string>
+    <string name="toBeImplemented">To be implemented</string>
+    <string name="addSuccess">You have been added to the list</string>
+    <string name="error">Error. Please try again</string>
+    <string name="isGroup">isGroup</string>
+    <string name="groupId">groupId</string>
+    <string name="groupCreationSuccess">Group Created Successfully</string>
+    <string name="exactDateTime">exactDateTime</string>
+    <string name="photoUri">photoUri</string>
+    <string name="status">status</string>
 </resources>

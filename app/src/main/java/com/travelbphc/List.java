@@ -15,12 +15,17 @@ import com.google.android.gms.tasks.OnCompleteListener;
 import com.google.android.gms.tasks.OnFailureListener;
 import com.google.android.gms.tasks.OnSuccessListener;
 import com.google.android.gms.tasks.Task;
+import com.google.firebase.Timestamp;
+import com.google.firebase.firestore.CollectionReference;
 import com.google.firebase.firestore.DocumentReference;
 import com.google.firebase.firestore.DocumentSnapshot;
-import com.google.firebase.firestore.QueryDocumentSnapshot;
 import com.google.firebase.firestore.QuerySnapshot;
+import com.google.firebase.firestore.SetOptions;
 
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Locale;
 import java.util.Map;
 
 /**
@@ -28,14 +33,33 @@ import java.util.Map;
  */
 
 public class List extends Fragment implements View.OnClickListener {
-    private DocumentReference doc;
+    private CollectionReference collectionReference;
     private ListView list;
     private Button getUsers;
     private Button getGroups;
+    private Timestamp[] condition = new Timestamp[2];
+    private String exactDateTime;
 
     public List() {
         Bundle args = getArguments();
-        doc = MainActivity.weakDBReference.get().collection("BITS Hyderabad").document(args.getString("location")).collection(args.getString("collection")).document(args.getString("document"));
+        try {
+            assert args != null;
+            exactDateTime = args.getString(getString(R.string.exactDateTime));
+            collectionReference = MainActivity.db.get()
+                    .collection(args.getString(getString(R.string.localOrOutstation)))
+                    .document(args.getString(getString(R.string.fromTo)))
+                    .collection(args.getString(getString(R.string.dateOfJourney)));
+            String[] array = args.getString(getString(R.string.queryCondition)).split("-");
+            String[] condition = new String[2];
+            condition[0] = args.getString(getString(R.string.dateOfJourney)) + "'T'" + array[0] + "'Z'";
+            condition[1] = args.getString(getString(R.string.dateOfJourney)) + "'T'" + array[1] + "'Z'";
+            SimpleDateFormat format = new SimpleDateFormat("dd-MM-yyyy'T'HH:mm'Z'", Locale.US);
+
+            this.condition[0] = new Timestamp(format.parse(condition[0]));
+            this.condition[1] = new Timestamp(format.parse(condition[1]));
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
     }
 
     @Override
@@ -57,49 +81,118 @@ public class List extends Fragment implements View.OnClickListener {
         if (v.getId() == R.id.getUsers) {
             assert getActivity() != null;
             getActivity().findViewById(R.id.loadingIcon).setVisibility(View.VISIBLE);
-            doc.get().addOnSuccessListener(new OnSuccessListener<DocumentSnapshot>() {
-                @Override
-                public void onSuccess(DocumentSnapshot documentSnapshot) {
-                    Map<String, Object> map = documentSnapshot.getData();
-                    assert map != null;
-                    assert getContext() != null;
-                    String[] array = map.keySet().toArray(new String[map.size()]);
-                    ArrayAdapter<String> adapter = new ArrayAdapter<>(getContext(), android.R.layout.simple_list_item_1, array);
-                    list.setAdapter(adapter);
-                    list.setVisibility(View.VISIBLE);
-                    getActivity().findViewById(R.id.loadingIcon).setVisibility(View.GONE);
-                    getGroups.setVisibility(View.GONE);
-                    getUsers.setVisibility(View.GONE);
-                }
-            }).addOnFailureListener(new OnFailureListener() {
-                @Override
-                public void onFailure(@NonNull Exception e) {
-                    Toast.makeText(getActivity(), "Couldn't get list (or no list exists)", Toast.LENGTH_SHORT).show();
-                }
-            });
-        } else if (v.getId() == R.id.getGroups) {
-            assert getActivity() != null;
-            getActivity().findViewById(R.id.loadingIcon).setVisibility(View.VISIBLE);
-            doc.collection("Groups").get().addOnCompleteListener(new OnCompleteListener<QuerySnapshot>() {
-                @Override
-                public void onComplete(@NonNull Task<QuerySnapshot> task) {
-                    if (task.isSuccessful()) {
-                        java.util.List<String> array = new ArrayList<>();
-                        for (QueryDocumentSnapshot document : task.getResult()) {
-                            array.add(document.getString("Users"));
+            collectionReference
+                    .whereGreaterThanOrEqualTo(getString(R.string.time), condition[0])
+                    .whereLessThanOrEqualTo(getString(R.string.time), condition[1])
+                    .whereEqualTo(getString(R.string.isGroup), false)
+                    .get()
+                    .addOnCompleteListener(new OnCompleteListener<QuerySnapshot>() {
+                        @Override
+                        public void onComplete(@NonNull Task<QuerySnapshot> task) {
+                            if (task.isSuccessful()) {
+                                ArrayList<String> coTravellers = new ArrayList<>();
+                                for (DocumentSnapshot doc : task.getResult()) {
+                                    coTravellers.add(doc.getString(getString(R.string.name)));
+                                    assert getContext() != null;
+                                    ArrayAdapter<String> adapter = new ArrayAdapter<>(getContext(), android.R.layout.simple_list_item_1, coTravellers);
+                                    list.setAdapter(adapter);
+                                    list.setVisibility(View.VISIBLE);
+                                    getActivity().findViewById(R.id.loadingIcon).setVisibility(View.GONE);
+                                    getGroups.setVisibility(View.GONE);
+                                    getUsers.setVisibility(View.GONE);
+                                }
+                            } else {
+                                Toast.makeText(getActivity(), R.string.error, Toast.LENGTH_SHORT).show();
+                            }
                         }
-                        assert getContext() != null;
-                        ArrayAdapter<String> adapter = new ArrayAdapter<>(getContext(), android.R.layout.simple_list_item_1, array);
-                        list.setAdapter(adapter);
-                        list.setVisibility(View.VISIBLE);
-                        getActivity().findViewById(R.id.loadingIcon).setVisibility(View.GONE);
-                        getGroups.setVisibility(View.GONE);
-                        getUsers.setVisibility(View.GONE);
-                    } else {
-                        Toast.makeText(getActivity(), "Error", Toast.LENGTH_SHORT).show();
-                    }
-                }
-            });
+                    });
+        } else if (v.getId() == R.id.getGroups) {
+            Toast.makeText(getActivity(), R.string.toBeImplemented, Toast.LENGTH_SHORT).show();
         }
+    }
+
+    private void makeGroup(Map<String, Object>[] memberDetails) {       //TODO: Make a sample map, and use this function... Name, Email, Phone, PhotoUri, UID
+        assert getActivity() != null;
+        Map<String, Object> groupData = new HashMap<>();
+        groupData.put(getString(R.string.isGroup), true);
+        groupData.put("members", 1);
+        for (Map<String, Object> member : memberDetails) {
+            if (member.get("UID").equals(MainActivity.user.getUid())) {
+                member.put("status", "approved");
+            } else {
+                member.put("status", "pending");
+            }
+            groupData.put(member.get("UID").toString(), member);
+        }
+
+        getActivity().findViewById(R.id.loadingIcon).setVisibility(View.VISIBLE);
+        collectionReference
+                .add(groupData)
+                .addOnSuccessListener(new OnSuccessListener<DocumentReference>() {
+                    @Override
+                    public void onSuccess(DocumentReference documentReference) {
+
+                        getActivity().findViewById(R.id.loadingIcon).setVisibility(View.GONE);
+                        //Register the user in this group
+                        Map<String, String> addGroupId = new HashMap<>(1);
+                        addGroupId.put(getString(R.string.groupId), documentReference.getId());
+
+                        //Add details to the current user
+                        getActivity().findViewById(R.id.loadingIcon).setVisibility(View.VISIBLE);
+                        collectionReference
+                                .document(MainActivity.user.getUid())
+                                .set(addGroupId, SetOptions.merge())
+                                .addOnSuccessListener(new OnSuccessListener<Void>() {
+                                    @Override
+                                    public void onSuccess(Void aVoid) {
+                                        getActivity().findViewById(R.id.loadingIcon).setVisibility(View.GONE);
+                                        Toast.makeText(getActivity(), R.string.groupCreationSuccess, Toast.LENGTH_SHORT).show();
+                                    }
+                                })
+                                .addOnFailureListener(new OnFailureListener() {
+                                    @Override
+                                    public void onFailure(@NonNull Exception e) {
+                                        getActivity().findViewById(R.id.loadingIcon).setVisibility(View.GONE);
+                                        Toast.makeText(getActivity(), R.string.error, Toast.LENGTH_SHORT).show();
+                                    }
+                                });
+
+                        //TODO: add pending status to other users (alternative implemented in MainActivity)
+
+                        //Add it in the user's travel history
+                        getActivity().findViewById(R.id.loadingIcon).setVisibility(View.VISIBLE);
+                        Map<String, Object> travelDetails = new HashMap<>();
+                        travelDetails.put(getString(R.string.groupId), documentReference.getId());
+                        Map<String, Object> historyData = new HashMap<>(1);
+                        historyData.put(exactDateTime, travelDetails);
+
+                        MainActivity.db
+                                .get()
+                                .collection("Users")
+                                .document(MainActivity.user.getUid())
+                                .set(historyData, SetOptions.merge())
+                                .addOnSuccessListener(new OnSuccessListener<Void>() {
+                                    @Override
+                                    public void onSuccess(Void aVoid) {
+                                        getActivity().findViewById(R.id.loadingIcon).setVisibility(View.GONE);
+                                    }
+                                })
+                                .addOnFailureListener(new OnFailureListener() {
+                                    @Override
+                                    public void onFailure(@NonNull Exception e) {
+                                        getActivity().findViewById(R.id.loadingIcon).setVisibility(View.GONE);
+                                        Toast.makeText(getActivity(), R.string.error, Toast.LENGTH_SHORT).show();
+                                    }
+                                });
+                    }
+                })
+                .addOnFailureListener(new OnFailureListener() {
+                    @Override
+                    public void onFailure(@NonNull Exception e) {
+                        getActivity().findViewById(R.id.loadingIcon).setVisibility(View.GONE);
+                        Toast.makeText(getActivity(), R.string.error, Toast.LENGTH_SHORT).show();
+                    }
+                });
+
     }
 }

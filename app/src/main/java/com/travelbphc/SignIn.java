@@ -5,7 +5,6 @@ import android.os.Bundle;
 import android.support.annotation.NonNull;
 import android.support.v4.app.Fragment;
 import android.support.v7.app.ActionBar;
-import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -73,14 +72,13 @@ public class SignIn extends Fragment implements View.OnClickListener {
         } catch (ApiException e) {
             // The ApiException status code indicates the detailed failure reason.
             // Please refer to the GoogleSignInStatusCodes class reference for more information.
-            Log.w("ApiException", "signInResult:failed code=" + e.getStatusCode());
-            Toast.makeText(getActivity(), "Error Signing in", Toast.LENGTH_SHORT).show();
+            Toast.makeText(getActivity(), R.string.error, Toast.LENGTH_SHORT).show();
         }
     }
 
     private void signIn() {
         GoogleSignInOptions gso = new GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
-                .setHostedDomain(getString(R.string.hosted_domain))
+                .setHostedDomain(getString(R.string.domain))
                 .requestIdToken(getString(R.string.Web_Client_Api_Key))
                 .requestEmail()
                 .requestProfile()
@@ -111,7 +109,7 @@ public class SignIn extends Fragment implements View.OnClickListener {
 
                         } else {
                             // If sign in fails, display a message to the user.
-                            Toast.makeText(getActivity(), "Error Signing in", Toast.LENGTH_SHORT).show();
+                            Toast.makeText(getActivity(), R.string.error, Toast.LENGTH_SHORT).show();
 
                         }
                     }

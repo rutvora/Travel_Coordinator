@@ -1,5 +1,6 @@
 package com.travelbphc;
 
+import android.app.Notification;
 import android.os.Bundle;
 import android.support.annotation.NonNull;
 import android.support.design.widget.NavigationView;
@@ -11,24 +12,43 @@ import android.support.v7.widget.Toolbar;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
+import android.widget.Toast;
 
 import com.google.android.gms.auth.api.signin.GoogleSignInAccount;
+import com.google.android.gms.common.ConnectionResult;
+import com.google.android.gms.common.GoogleApiAvailability;
+import com.google.android.gms.tasks.OnCompleteListener;
+import com.google.android.gms.tasks.Task;
 import com.google.firebase.FirebaseApp;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
+import com.google.firebase.firestore.DocumentSnapshot;
+import com.google.firebase.firestore.FieldValue;
 import com.google.firebase.firestore.FirebaseFirestore;
+import com.google.firebase.firestore.QuerySnapshot;
+import com.uber.sdk.android.core.UberSdk;
+import com.uber.sdk.android.rides.RideParameters;
+import com.uber.sdk.android.rides.RideRequestButton;
+import com.uber.sdk.rides.client.ServerTokenSession;
+import com.uber.sdk.rides.client.SessionConfiguration;
 
 import java.lang.ref.WeakReference;
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
+import java.util.Date;
+import java.util.HashMap;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Set;
 
 public class MainActivity extends AppCompatActivity
         implements NavigationView.OnNavigationItemSelectedListener {
 
-    static WeakReference<FirebaseFirestore> weakDBReference;
+    static WeakReference<FirebaseFirestore> db;
     static FirebaseAuth firebaseAuth;
     static GoogleSignInAccount account;
     static FirebaseUser user;
     static WeakReference<AppCompatActivity> mainActivity;
-    FirebaseFirestore db;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -56,29 +76,65 @@ public class MainActivity extends AppCompatActivity
 
         //Initialize firebase and corresponding requirements
         FirebaseApp.initializeApp(this);
-        db = FirebaseFirestore.getInstance();
-        weakDBReference = new WeakReference<>(db);
+        final FirebaseFirestore db = FirebaseFirestore.getInstance();
+        MainActivity.db = new WeakReference<>(db);
         firebaseAuth = FirebaseAuth.getInstance();
 
         //Check for firebase Sign-In
         user = firebaseAuth.getCurrentUser();
         //account = GoogleSignIn.getLastSignedInAccount(this);
 
-        if (user == null) {
-            try {
-                assert getSupportActionBar() != null;
-                getSupportActionBar().hide();
-                getSupportFragmentManager().beginTransaction().replace(R.id.fragment, new SignIn()).commit();
-
-            } catch (NullPointerException e) {
-                e.printStackTrace();
-            }
+        if (!(GoogleApiAvailability.getInstance().isGooglePlayServicesAvailable(this) == ConnectionResult.SUCCESS)) {
+            GoogleApiAvailability.getInstance().makeGooglePlayServicesAvailable(this);
         } else {
-            getSupportFragmentManager().beginTransaction().replace(R.id.fragment, new LocalTravel()).commit();
-        }
 
-        //Create a weakReference to itself
-        mainActivity = new WeakReference<AppCompatActivity>(this);
+            if (user == null) {
+                try {
+                    assert getSupportActionBar() != null;
+                    getSupportActionBar().hide();
+                    getSupportFragmentManager().beginTransaction().replace(R.id.fragment, new SignIn()).commit();
+
+                } catch (NullPointerException e) {
+                    e.printStackTrace();
+                }
+            } else {
+                getSupportFragmentManager().beginTransaction().replace(R.id.fragment, new LocalTravel()).commit();
+
+                //Get pending group requests
+                db
+                        .collection("Users")
+                        .document(user.getUid())
+                        .get()
+                        .addOnCompleteListener(new OnCompleteListener<DocumentSnapshot>() {
+                            @Override
+                            public void onComplete(@NonNull Task<DocumentSnapshot> task) {
+                                if (task.isSuccessful()) {
+                                    DocumentSnapshot snapshot = task.getResult();           //TODO: Realise that the same can be used in travel history too
+                                    assert snapshot.getData() != null;
+                                    Set<String> keys = snapshot.getData().keySet();
+                                    SimpleDateFormat format = new SimpleDateFormat("dd-MM-yyyy'T'HH:mm'Z'", Locale.US);
+                                    for (String key : keys) {
+                                        try {
+                                            if (new Date().after(format.parse(key))) {
+                                                keys.remove(key);
+                                            }
+                                        } catch (ParseException e) {
+                                            e.printStackTrace();
+                                        }
+                                    }
+                                    checkPendingRequests(snapshot.getData(), keys);
+
+                                } else {
+                                    Toast.makeText(MainActivity.this, R.string.error, Toast.LENGTH_SHORT).show();
+                                }
+                            }
+                        });
+
+            }
+
+            //Create a weakReference to itself
+            mainActivity = new WeakReference<AppCompatActivity>(this);
+        }
     }
 
     @Override
@@ -130,5 +186,121 @@ public class MainActivity extends AppCompatActivity
         DrawerLayout drawer = findViewById(R.id.drawer_layout);
         drawer.closeDrawer(GravityCompat.START);
         return true;
+    }
+
+    private void checkPendingRequests(Map<String, Object> travels, Set<String> keys) {
+        final Notification notification = new Notification.Builder(this)
+                .setContentTitle("Pending Group Requests")
+                .setContentText("Click here to Check")
+                .setSmallIcon(R.mipmap.ic_launcher)
+                .setOngoing(true) // Make it non-removable
+                .build();
+        Map<String, Object> userDetails = new HashMap<>();
+        userDetails.put(getString(R.string.name), user.getDisplayName());
+        userDetails.put(getString(R.string.email), user.getEmail());
+        userDetails.put(getString(R.string.phone), user.getPhoneNumber());           //TODO: find alternative
+        userDetails.put(getString(R.string.photoUri), user.getPhotoUrl());
+        userDetails.put("UID", user.getUid());
+        userDetails.put(getString(R.string.status), "pending");
+        for (String key : keys) {
+            Map<String, Object> travelDetails = (Map<String, Object>) travels.get(key);
+
+            db.get()
+                    .collection("Local")
+                    .document(travelDetails.get(getString(R.string.fromTo)).toString())
+                    .collection(travelDetails.get(getString(R.string.dateOfJourney)).toString())
+                    .whereEqualTo(getString(R.string.isGroup), true)
+                    .whereEqualTo(user.getUid(), userDetails)
+                    .get()
+                    .addOnCompleteListener(new OnCompleteListener<QuerySnapshot>() {
+                        @Override
+                        public void onComplete(@NonNull Task<QuerySnapshot> task) {
+                            if (task.isSuccessful()) {
+                                for (DocumentSnapshot doc : task.getResult()) {
+                                    notification.notify();       //TODO: Create a list of pending notifications
+                                }
+                            }
+                        }
+                    });
+
+        }
+    }
+
+    private void approveRequest(final DocumentSnapshot documentSnapshot) {
+        final Map<String, Object> userDetails = new HashMap<>();
+        userDetails.put(getString(R.string.name), user.getDisplayName());
+        userDetails.put(getString(R.string.email), user.getEmail());
+        userDetails.put(getString(R.string.phone), user.getPhoneNumber());           //TODO: find alternative
+        userDetails.put(getString(R.string.photoUri), user.getPhotoUrl());
+        userDetails.put("UID", user.getUid());
+        userDetails.put(getString(R.string.status), "pending");
+        findViewById(R.id.loadingIcon).setVisibility(View.VISIBLE);
+        documentSnapshot
+                .getReference()
+                .update(user.getUid() + ".status", "approved",
+                        "members", Integer.parseInt(documentSnapshot.get("members").toString()) + 1)
+                .addOnCompleteListener(new OnCompleteListener<Void>() {
+                    @Override
+                    public void onComplete(@NonNull Task<Void> task) {
+                        //Remove from all others
+                        documentSnapshot.getReference()
+                                .getParent()
+                                .whereEqualTo(getString(R.string.isGroup), true)
+                                .whereEqualTo(user.getUid(), userDetails)
+                                .get()
+                                .addOnCompleteListener(new OnCompleteListener<QuerySnapshot>() {
+                                    @Override
+                                    public void onComplete(@NonNull Task<QuerySnapshot> task) {
+                                        if (task.isSuccessful()) {
+                                            for (DocumentSnapshot doc : task.getResult()) {
+                                                doc.getReference()
+                                                        .update(user.getUid(), FieldValue.delete())
+                                                        .addOnCompleteListener(new OnCompleteListener<Void>() {
+                                                            @Override
+                                                            public void onComplete(@NonNull Task<Void> task) {
+                                                                findViewById(R.id.loadingIcon).setVisibility(View.GONE);
+                                                            }
+                                                        });
+                                            }
+                                        }
+                                    }
+                                });
+                    }
+                });
+    }
+
+    private void initializeUberSDK() {               //TODO: Place code in right location (button currently in get_list.xml)
+        SessionConfiguration config = new SessionConfiguration.Builder()
+                // mandatory
+                .setClientId(getString(R.string.Uber_Client_Id))
+                // required for enhanced button features
+                .setServerToken(getString(R.string.Uber_Server_Token))
+                // required for implicit grant authentication
+                .setRedirectUri("<REDIRECT_URI>")
+                // optional: set sandbox as operating environment
+                .setEnvironment(SessionConfiguration.Environment.SANDBOX)
+                .build();
+
+        UberSdk.initialize(config);
+
+        RideRequestButton uberButton = findViewById(R.id.getUber);
+
+        ServerTokenSession session = new ServerTokenSession(config);
+        uberButton.setSession(session);
+
+        //TODO: Replace Sample Data
+        RideParameters rideParams = new RideParameters.Builder()
+                // Optional product_id from /v1/products endpoint (e.g. UberX). If not provided, most cost-efficient product will be used
+                .setProductId("a1111c8c-c720-46c3-8534-2fcdd730040d")
+                // Required for price estimates; lat (Double), lng (Double), nickname (String), formatted address (String) of dropoff location
+                .setDropoffLocation(
+                        37.775304, -122.417522, "Uber HQ", "1455 Market Street, San Francisco")
+                // Required for pickup estimates; lat (Double), lng (Double), nickname (String), formatted address (String) of pickup location
+                .setPickupLocation(37.775304, -122.417522, "Uber HQ", "1455 Market Street, San Francisco")
+                .build();
+// set parameters for the RideRequestButton instance
+        uberButton.setRideParameters(rideParams);
+        findViewById(R.id.loadingIcon).setVisibility(View.VISIBLE);
+        uberButton.loadRideInformation();           //TODO: separate loader for this (use RideRequestButtonCallback interface)
     }
 }
