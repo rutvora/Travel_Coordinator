@@ -37,8 +37,8 @@ import java.util.Map;
  */
 
 public class LocalTravel extends Fragment implements View.OnClickListener {
-    Place from, to;
-    TextView date, time;
+    private Place from, to;
+    private TextView date, time;
 
     public LocalTravel() {
     }
@@ -58,7 +58,7 @@ public class LocalTravel extends Fragment implements View.OnClickListener {
                 }
 
                 @Override
-                public void onError(Status status) {
+                public void onError(@NonNull Status status) {
                     Toast.makeText(getContext(), status.toString(), Toast.LENGTH_SHORT).show();
                 }
             });
@@ -72,7 +72,7 @@ public class LocalTravel extends Fragment implements View.OnClickListener {
                 }
 
                 @Override
-                public void onError(Status status) {
+                public void onError(@NonNull Status status) {
                     Toast.makeText(getContext(), status.toString(), Toast.LENGTH_SHORT).show();
                 }
             });
@@ -93,7 +93,7 @@ public class LocalTravel extends Fragment implements View.OnClickListener {
     }
 
     @Override
-    public void onClick(View v) {
+    public void onClick(@NonNull View v) {
         if (v.getId() == R.id.datePicker) {
             int mYear, mMonth, mDay;
             final Calendar c = Calendar.getInstance();

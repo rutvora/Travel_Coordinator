@@ -1,9 +1,15 @@
 package com.travelbphc;
 
 import android.app.Notification;
+import android.app.NotificationChannel;
+import android.app.NotificationManager;
+import android.os.Build;
 import android.os.Bundle;
 import android.support.annotation.NonNull;
+import android.support.annotation.Nullable;
 import android.support.design.widget.NavigationView;
+import android.support.v4.app.NotificationCompat;
+import android.support.v4.app.NotificationManagerCompat;
 import android.support.v4.view.GravityCompat;
 import android.support.v4.widget.DrawerLayout;
 import android.support.v7.app.ActionBarDrawerToggle;
@@ -47,8 +53,10 @@ public class MainActivity extends AppCompatActivity
     static WeakReference<FirebaseFirestore> db;
     static FirebaseAuth firebaseAuth;
     static GoogleSignInAccount account;
+    @Nullable
     static FirebaseUser user;
     static WeakReference<AppCompatActivity> mainActivity;
+    private final String CHANNEL_ID = "Channel ID";             //TODO
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -155,7 +163,7 @@ public class MainActivity extends AppCompatActivity
     }
 
     @Override
-    public boolean onOptionsItemSelected(MenuItem item) {
+    public boolean onOptionsItemSelected(@NonNull MenuItem item) {
         // Handle action bar item clicks here. The action bar will
         // automatically handle clicks on the Home/Up button, so long
         // as you specify a parent activity in AndroidManifest.xml.
@@ -188,13 +196,14 @@ public class MainActivity extends AppCompatActivity
         return true;
     }
 
-    private void checkPendingRequests(Map<String, Object> travels, Set<String> keys) {
-        final Notification notification = new Notification.Builder(this)
+    private void checkPendingRequests(@NonNull Map<String, Object> travels, @NonNull Set<String> keys) {
+        final Notification notification = new NotificationCompat.Builder(this, CHANNEL_ID)
                 .setContentTitle("Pending Group Requests")
                 .setContentText("Click here to Check")
                 .setSmallIcon(R.mipmap.ic_launcher)
-                .setOngoing(true) // Make it non-removable
-                .build();
+                .setOngoing(true)
+                .build(); // Make it non-removable
+        final NotificationManagerCompat notificationManager = NotificationManagerCompat.from(this);
         Map<String, Object> userDetails = new HashMap<>();
         userDetails.put(getString(R.string.name), user.getDisplayName());
         userDetails.put(getString(R.string.email), user.getEmail());
@@ -203,7 +212,8 @@ public class MainActivity extends AppCompatActivity
         userDetails.put("UID", user.getUid());
         userDetails.put(getString(R.string.status), "pending");
         for (String key : keys) {
-            Map<String, Object> travelDetails = (Map<String, Object>) travels.get(key);
+            @SuppressWarnings("unchecked")      //TODO: Check if the typecasting works
+                    Map<String, Object> travelDetails = (Map<String, Object>) travels.get(key);
 
             db.get()
                     .collection("Local")
@@ -217,7 +227,7 @@ public class MainActivity extends AppCompatActivity
                         public void onComplete(@NonNull Task<QuerySnapshot> task) {
                             if (task.isSuccessful()) {
                                 for (DocumentSnapshot doc : task.getResult()) {
-                                    notification.notify();       //TODO: Create a list of pending notifications
+                                    notificationManager.notify(0, notification);      //TODO
                                 }
                             }
                         }
@@ -226,7 +236,7 @@ public class MainActivity extends AppCompatActivity
         }
     }
 
-    private void approveRequest(final DocumentSnapshot documentSnapshot) {
+    private void approveRequest(@NonNull final DocumentSnapshot documentSnapshot) {
         final Map<String, Object> userDetails = new HashMap<>();
         userDetails.put(getString(R.string.name), user.getDisplayName());
         userDetails.put(getString(R.string.email), user.getEmail());
@@ -235,10 +245,11 @@ public class MainActivity extends AppCompatActivity
         userDetails.put("UID", user.getUid());
         userDetails.put(getString(R.string.status), "pending");
         findViewById(R.id.loadingIcon).setVisibility(View.VISIBLE);
+
         documentSnapshot
                 .getReference()
                 .update(user.getUid() + ".status", "approved",
-                        "members", Integer.parseInt(documentSnapshot.get("members").toString()) + 1)
+                        "members", Integer.parseInt(documentSnapshot.getString("members")) + 1)
                 .addOnCompleteListener(new OnCompleteListener<Void>() {
                     @Override
                     public void onComplete(@NonNull Task<Void> task) {
@@ -302,5 +313,21 @@ public class MainActivity extends AppCompatActivity
         uberButton.setRideParameters(rideParams);
         findViewById(R.id.loadingIcon).setVisibility(View.VISIBLE);
         uberButton.loadRideInformation();           //TODO: separate loader for this (use RideRequestButtonCallback interface)
+    }
+
+    private void createNotificationChannel() {                  //TODO
+        // Create the NotificationChannel, but only on API 26+ because
+        // the NotificationChannel class is new and not in the support library
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            CharSequence name = "Channel name";
+            String description = "Channel Description";
+            int importance = NotificationManager.IMPORTANCE_DEFAULT;
+            NotificationChannel channel = new NotificationChannel(CHANNEL_ID, name, importance);
+            channel.setDescription(description);
+            // Register the channel with the system; you can't change the importance
+            // or other notification behaviors after this
+            NotificationManager notificationManager = getSystemService(NotificationManager.class);
+            notificationManager.createNotificationChannel(channel);
+        }
     }
 }

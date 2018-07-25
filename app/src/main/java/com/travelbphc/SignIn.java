@@ -40,7 +40,7 @@ public class SignIn extends Fragment implements View.OnClickListener {
     }
 
     @Override
-    public void onClick(View v) {
+    public void onClick(@NonNull View v) {
         switch (v.getId()) {
             case R.id.sign_in_button:
                 signIn();
@@ -62,7 +62,7 @@ public class SignIn extends Fragment implements View.OnClickListener {
         }
     }
 
-    private void handleSignInResult(Task<GoogleSignInAccount> completedTask) {
+    private void handleSignInResult(@NonNull Task<GoogleSignInAccount> completedTask) {
         try {
             MainActivity.account = completedTask.getResult(ApiException.class);
 
@@ -89,7 +89,7 @@ public class SignIn extends Fragment implements View.OnClickListener {
         startActivityForResult(signInIntent, 0);
     }
 
-    private void firebaseAuthWithGoogle(GoogleSignInAccount acct) {
+    private void firebaseAuthWithGoogle(@NonNull GoogleSignInAccount acct) {
 
         assert getActivity() != null;
         AuthCredential credential = GoogleAuthProvider.getCredential(acct.getIdToken(), null);

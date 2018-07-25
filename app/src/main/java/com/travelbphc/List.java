@@ -2,6 +2,7 @@ package com.travelbphc;
 
 import android.os.Bundle;
 import android.support.annotation.NonNull;
+import android.support.annotation.Nullable;
 import android.support.v4.app.Fragment;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -33,23 +34,31 @@ import java.util.Map;
  */
 
 public class List extends Fragment implements View.OnClickListener {
+    final private Timestamp[] condition = new Timestamp[2];
     private CollectionReference collectionReference;
     private ListView list;
     private Button getUsers;
     private Button getGroups;
-    private Timestamp[] condition = new Timestamp[2];
+    @Nullable
     private String exactDateTime;
 
     public List() {
         Bundle args = getArguments();
         try {
             assert args != null;
+            String local = args.getString(getString(R.string.localOrOutstation));
+            String fromTo = args.getString(getString(R.string.fromTo));
+            String date = args.getString(getString(R.string.dateOfJourney));
             exactDateTime = args.getString(getString(R.string.exactDateTime));
+
+            assert local != null && fromTo != null && date != null;
             collectionReference = MainActivity.db.get()
-                    .collection(args.getString(getString(R.string.localOrOutstation)))
-                    .document(args.getString(getString(R.string.fromTo)))
-                    .collection(args.getString(getString(R.string.dateOfJourney)));
-            String[] array = args.getString(getString(R.string.queryCondition)).split("-");
+                    .collection(local)
+                    .document(fromTo)
+                    .collection(date);
+            String query = args.getString(getString(R.string.queryCondition));
+            assert query != null;
+            String[] array = query.split("-");
             String[] condition = new String[2];
             condition[0] = args.getString(getString(R.string.dateOfJourney)) + "'T'" + array[0] + "'Z'";
             condition[1] = args.getString(getString(R.string.dateOfJourney)) + "'T'" + array[1] + "'Z'";
@@ -77,7 +86,7 @@ public class List extends Fragment implements View.OnClickListener {
     }
 
     @Override
-    public void onClick(View v) {
+    public void onClick(@NonNull View v) {
         if (v.getId() == R.id.getUsers) {
             assert getActivity() != null;
             getActivity().findViewById(R.id.loadingIcon).setVisibility(View.VISIBLE);
@@ -111,12 +120,13 @@ public class List extends Fragment implements View.OnClickListener {
         }
     }
 
-    private void makeGroup(Map<String, Object>[] memberDetails) {       //TODO: Make a sample map, and use this function... Name, Email, Phone, PhotoUri, UID
+    private void makeGroup(@NonNull Map<String, Object>[] memberDetails) {       //TODO: Make a sample map, and use this function... Name, Email, Phone, PhotoUri, UID
         assert getActivity() != null;
         Map<String, Object> groupData = new HashMap<>();
         groupData.put(getString(R.string.isGroup), true);
         groupData.put("members", 1);
         for (Map<String, Object> member : memberDetails) {
+
             if (member.get("UID").equals(MainActivity.user.getUid())) {
                 member.put("status", "approved");
             } else {
@@ -130,7 +140,7 @@ public class List extends Fragment implements View.OnClickListener {
                 .add(groupData)
                 .addOnSuccessListener(new OnSuccessListener<DocumentReference>() {
                     @Override
-                    public void onSuccess(DocumentReference documentReference) {
+                    public void onSuccess(@NonNull DocumentReference documentReference) {
 
                         getActivity().findViewById(R.id.loadingIcon).setVisibility(View.GONE);
                         //Register the user in this group
