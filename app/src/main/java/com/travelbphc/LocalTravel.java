@@ -109,7 +109,11 @@ public class LocalTravel extends Fragment implements View.OnClickListener {
                         @Override
                         public void onDateSet(DatePicker view, int year,
                                               int monthOfYear, int dayOfMonth) {
-                            String printDate = dayOfMonth + "-" + (monthOfYear + 1) + "-" + year;
+                            String printDate = (dayOfMonth < 10 ? "0" + dayOfMonth : dayOfMonth)
+                                    + "-"
+                                    + ((monthOfYear + 1) < 10 ? "0" + (monthOfYear + 1) : (monthOfYear + 1))
+                                    + "-"
+                                    + year;
                             date.setText(printDate);
 
                         }
@@ -130,7 +134,9 @@ public class LocalTravel extends Fragment implements View.OnClickListener {
                         @Override
                         public void onTimeSet(TimePicker view, int hourOfDay,
                                               int minute) {
-                            String printTime = hourOfDay + ":" + minute;
+                            String printTime = (hourOfDay < 10 ? "0" + hourOfDay : hourOfDay)
+                                    + ":"
+                                    + (minute < 10 ? "0" + minute : minute);
                             time.setText(printTime);
                         }
                     }, mHour, mMinute, false);
@@ -192,7 +198,7 @@ public class LocalTravel extends Fragment implements View.OnClickListener {
         String time = this.time.getText().toString();
 
         //Get Exact Date time to get while querying.
-        String exactDateTime = date + "'T'" + time + "'Z'";
+        String exactDateTime = date + " " + time;
 
         //Collect info and store in the database for easier access
         Map<String, Object> info = new HashMap<>();
@@ -200,13 +206,13 @@ public class LocalTravel extends Fragment implements View.OnClickListener {
         info.put(getString(R.string.email), MainActivity.user.getEmail());
         EditText phoneNumber = getActivity().findViewById(R.id.phoneNumber);
         info.put(getString(R.string.phone), phoneNumber.getText().toString());      //TODO: find alternative
-        info.put(getString(R.string.photoUri), MainActivity.user.getPhotoUrl());
+        info.put(getString(R.string.photoUri), MainActivity.user.getPhotoUrl().toString());
 
         info.put(getString(R.string.isGroup), false);
 
         info.put("fromAddress", this.from.getAddress());
         info.put("toAddress", this.to.getAddress());
-        SimpleDateFormat format = new SimpleDateFormat("dd-MM-yyyy'T'HH:mm'Z'", Locale.US);
+        SimpleDateFormat format = new SimpleDateFormat("dd-MM-yyyy HH:mm", Locale.US);
         try {
             Date dateToAdd = format.parse(exactDateTime);
             Timestamp timestamp = new Timestamp(dateToAdd);

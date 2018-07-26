@@ -73,6 +73,7 @@ public class SignIn extends Fragment implements View.OnClickListener {
             // The ApiException status code indicates the detailed failure reason.
             // Please refer to the GoogleSignInStatusCodes class reference for more information.
             Toast.makeText(getActivity(), R.string.error, Toast.LENGTH_SHORT).show();
+
         }
     }
 
@@ -110,7 +111,7 @@ public class SignIn extends Fragment implements View.OnClickListener {
                         } else {
                             // If sign in fails, display a message to the user.
                             Toast.makeText(getActivity(), R.string.error, Toast.LENGTH_SHORT).show();
-
+                            //task.getException().printStackTrace();
                         }
                     }
                 });

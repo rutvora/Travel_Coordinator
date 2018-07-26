@@ -31,6 +31,7 @@ import com.google.firebase.auth.FirebaseUser;
 import com.google.firebase.firestore.DocumentSnapshot;
 import com.google.firebase.firestore.FieldValue;
 import com.google.firebase.firestore.FirebaseFirestore;
+import com.google.firebase.firestore.FirebaseFirestoreSettings;
 import com.google.firebase.firestore.QuerySnapshot;
 import com.uber.sdk.android.core.UberSdk;
 import com.uber.sdk.android.rides.RideParameters;
@@ -85,12 +86,15 @@ public class MainActivity extends AppCompatActivity
         //Initialize firebase and corresponding requirements
         FirebaseApp.initializeApp(this);
         final FirebaseFirestore db = FirebaseFirestore.getInstance();
+        FirebaseFirestoreSettings settings = new FirebaseFirestoreSettings.Builder().setTimestampsInSnapshotsEnabled(true).build();
+        db.setFirestoreSettings(settings);
         MainActivity.db = new WeakReference<>(db);
         firebaseAuth = FirebaseAuth.getInstance();
 
         //Check for firebase Sign-In
         user = firebaseAuth.getCurrentUser();
         //account = GoogleSignIn.getLastSignedInAccount(this);
+
 
         if (!(GoogleApiAvailability.getInstance().isGooglePlayServicesAvailable(this) == ConnectionResult.SUCCESS)) {
             GoogleApiAvailability.getInstance().makeGooglePlayServicesAvailable(this);
@@ -118,19 +122,20 @@ public class MainActivity extends AppCompatActivity
                             public void onComplete(@NonNull Task<DocumentSnapshot> task) {
                                 if (task.isSuccessful()) {
                                     DocumentSnapshot snapshot = task.getResult();           //TODO: Realise that the same can be used in travel history too
-                                    assert snapshot.getData() != null;
-                                    Set<String> keys = snapshot.getData().keySet();
-                                    SimpleDateFormat format = new SimpleDateFormat("dd-MM-yyyy'T'HH:mm'Z'", Locale.US);
-                                    for (String key : keys) {
-                                        try {
-                                            if (new Date().after(format.parse(key))) {
-                                                keys.remove(key);
+                                    if (snapshot.getData() != null) {
+                                        Set<String> keys = snapshot.getData().keySet();
+                                        SimpleDateFormat format = new SimpleDateFormat("dd-MM-yyyy HH:mm", Locale.US);
+                                        for (String key : keys) {
+                                            try {
+                                                if (new Date().after(format.parse(key))) {
+                                                    keys.remove(key);
+                                                }
+                                            } catch (ParseException e) {
+                                                e.printStackTrace();
                                             }
-                                        } catch (ParseException e) {
-                                            e.printStackTrace();
                                         }
+                                        checkPendingRequests(snapshot.getData(), keys);
                                     }
-                                    checkPendingRequests(snapshot.getData(), keys);
 
                                 } else {
                                     Toast.makeText(MainActivity.this, R.string.error, Toast.LENGTH_SHORT).show();
@@ -205,79 +210,83 @@ public class MainActivity extends AppCompatActivity
                 .build(); // Make it non-removable
         final NotificationManagerCompat notificationManager = NotificationManagerCompat.from(this);
         Map<String, Object> userDetails = new HashMap<>();
-        userDetails.put(getString(R.string.name), user.getDisplayName());
-        userDetails.put(getString(R.string.email), user.getEmail());
-        userDetails.put(getString(R.string.phone), user.getPhoneNumber());           //TODO: find alternative
-        userDetails.put(getString(R.string.photoUri), user.getPhotoUrl());
-        userDetails.put("UID", user.getUid());
-        userDetails.put(getString(R.string.status), "pending");
-        for (String key : keys) {
-            @SuppressWarnings("unchecked")      //TODO: Check if the typecasting works
-                    Map<String, Object> travelDetails = (Map<String, Object>) travels.get(key);
+        if (user != null) {
+            userDetails.put(getString(R.string.name), user.getDisplayName());
+            userDetails.put(getString(R.string.email), user.getEmail());
+            userDetails.put(getString(R.string.phone), user.getPhoneNumber());           //TODO: find alternative
+            userDetails.put(getString(R.string.photoUri), user.getPhotoUrl().toString());
+            userDetails.put("UID", user.getUid());
+            userDetails.put(getString(R.string.status), "pending");
+            for (String key : keys) {
+                @SuppressWarnings("unchecked")      //TODO: Check if the typecasting works
+                        Map<String, Object> travelDetails = (Map<String, Object>) travels.get(key);
 
-            db.get()
-                    .collection("Local")
-                    .document(travelDetails.get(getString(R.string.fromTo)).toString())
-                    .collection(travelDetails.get(getString(R.string.dateOfJourney)).toString())
-                    .whereEqualTo(getString(R.string.isGroup), true)
-                    .whereEqualTo(user.getUid(), userDetails)
-                    .get()
-                    .addOnCompleteListener(new OnCompleteListener<QuerySnapshot>() {
-                        @Override
-                        public void onComplete(@NonNull Task<QuerySnapshot> task) {
-                            if (task.isSuccessful()) {
-                                for (DocumentSnapshot doc : task.getResult()) {
-                                    notificationManager.notify(0, notification);      //TODO
+                db.get()
+                        .collection("Local")
+                        .document(travelDetails.get(getString(R.string.fromTo)).toString())
+                        .collection(travelDetails.get(getString(R.string.dateOfJourney)).toString())
+                        .whereEqualTo(getString(R.string.isGroup), true)
+                        .whereEqualTo(user.getUid(), userDetails)
+                        .get()
+                        .addOnCompleteListener(new OnCompleteListener<QuerySnapshot>() {
+                            @Override
+                            public void onComplete(@NonNull Task<QuerySnapshot> task) {
+                                if (task.isSuccessful()) {
+                                    for (DocumentSnapshot doc : task.getResult()) {
+                                        notificationManager.notify(0, notification);      //TODO
+                                    }
                                 }
                             }
-                        }
-                    });
+                        });
 
+            }
         }
     }
 
     private void approveRequest(@NonNull final DocumentSnapshot documentSnapshot) {
         final Map<String, Object> userDetails = new HashMap<>();
-        userDetails.put(getString(R.string.name), user.getDisplayName());
-        userDetails.put(getString(R.string.email), user.getEmail());
-        userDetails.put(getString(R.string.phone), user.getPhoneNumber());           //TODO: find alternative
-        userDetails.put(getString(R.string.photoUri), user.getPhotoUrl());
-        userDetails.put("UID", user.getUid());
-        userDetails.put(getString(R.string.status), "pending");
-        findViewById(R.id.loadingIcon).setVisibility(View.VISIBLE);
+        if (user != null) {
+            userDetails.put(getString(R.string.name), user.getDisplayName());
+            userDetails.put(getString(R.string.email), user.getEmail());
+            userDetails.put(getString(R.string.phone), user.getPhoneNumber());           //TODO: find alternative
+            userDetails.put(getString(R.string.photoUri), user.getPhotoUrl());
+            userDetails.put("UID", user.getUid());
+            userDetails.put(getString(R.string.status), "pending");
+            findViewById(R.id.loadingIcon).setVisibility(View.VISIBLE);
 
-        documentSnapshot
-                .getReference()
-                .update(user.getUid() + ".status", "approved",
-                        "members", Integer.parseInt(documentSnapshot.getString("members")) + 1)
-                .addOnCompleteListener(new OnCompleteListener<Void>() {
-                    @Override
-                    public void onComplete(@NonNull Task<Void> task) {
-                        //Remove from all others
-                        documentSnapshot.getReference()
-                                .getParent()
-                                .whereEqualTo(getString(R.string.isGroup), true)
-                                .whereEqualTo(user.getUid(), userDetails)
-                                .get()
-                                .addOnCompleteListener(new OnCompleteListener<QuerySnapshot>() {
-                                    @Override
-                                    public void onComplete(@NonNull Task<QuerySnapshot> task) {
-                                        if (task.isSuccessful()) {
-                                            for (DocumentSnapshot doc : task.getResult()) {
-                                                doc.getReference()
-                                                        .update(user.getUid(), FieldValue.delete())
-                                                        .addOnCompleteListener(new OnCompleteListener<Void>() {
-                                                            @Override
-                                                            public void onComplete(@NonNull Task<Void> task) {
-                                                                findViewById(R.id.loadingIcon).setVisibility(View.GONE);
-                                                            }
-                                                        });
+            documentSnapshot
+                    .getReference()
+                    .update(user.getUid() + ".status", "approved",
+                            "members", Integer.parseInt(documentSnapshot.getString("members")) + 1)
+                    .addOnCompleteListener(new OnCompleteListener<Void>() {
+                        @Override
+                        public void onComplete(@NonNull Task<Void> task) {
+                            //Remove from all others
+                            documentSnapshot.getReference()
+                                    .getParent()
+                                    .whereEqualTo(getString(R.string.isGroup), true)
+                                    .whereEqualTo(user.getUid(), userDetails)
+                                    .get()
+                                    .addOnCompleteListener(new OnCompleteListener<QuerySnapshot>() {
+                                        @Override
+                                        public void onComplete(@NonNull Task<QuerySnapshot> task) {
+                                            if (task.isSuccessful()) {
+                                                for (DocumentSnapshot doc : task.getResult()) {
+                                                    doc.getReference()
+                                                            .update(user.getUid(), FieldValue.delete())
+                                                            .addOnCompleteListener(new OnCompleteListener<Void>() {
+                                                                @Override
+                                                                public void onComplete(@NonNull Task<Void> task) {
+                                                                    findViewById(R.id.loadingIcon).setVisibility(View.GONE);
+                                                                }
+                                                            });
+                                                }
                                             }
                                         }
-                                    }
-                                });
-                    }
-                });
+                                    });
+                        }
+                    });
+        }
     }
 
     private void initializeUberSDK() {               //TODO: Place code in right location (button currently in get_list.xml)
@@ -327,7 +336,10 @@ public class MainActivity extends AppCompatActivity
             // Register the channel with the system; you can't change the importance
             // or other notification behaviors after this
             NotificationManager notificationManager = getSystemService(NotificationManager.class);
-            notificationManager.createNotificationChannel(channel);
+
+            if (notificationManager != null) {
+                notificationManager.createNotificationChannel(channel);
+            }
         }
     }
 }

@@ -4,6 +4,7 @@ import android.os.Bundle;
 import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
 import android.support.v4.app.Fragment;
+import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -43,6 +44,14 @@ public class List extends Fragment implements View.OnClickListener {
     private String exactDateTime;
 
     public List() {
+
+    }
+
+    @Override
+    public View onCreateView(@NonNull LayoutInflater inflater, ViewGroup container,
+                             Bundle savedInstanceState) {
+        View rootView = inflater.inflate(R.layout.get_list, container, false);
+
         Bundle args = getArguments();
         try {
             assert args != null;
@@ -52,6 +61,7 @@ public class List extends Fragment implements View.OnClickListener {
             exactDateTime = args.getString(getString(R.string.exactDateTime));
 
             assert local != null && fromTo != null && date != null;
+            Log.w("variables", local + fromTo + date);
             collectionReference = MainActivity.db.get()
                     .collection(local)
                     .document(fromTo)
@@ -60,21 +70,16 @@ public class List extends Fragment implements View.OnClickListener {
             assert query != null;
             String[] array = query.split("-");
             String[] condition = new String[2];
-            condition[0] = args.getString(getString(R.string.dateOfJourney)) + "'T'" + array[0] + "'Z'";
-            condition[1] = args.getString(getString(R.string.dateOfJourney)) + "'T'" + array[1] + "'Z'";
-            SimpleDateFormat format = new SimpleDateFormat("dd-MM-yyyy'T'HH:mm'Z'", Locale.US);
+            condition[0] = args.getString(getString(R.string.dateOfJourney)) + " " + array[0];
+            condition[1] = args.getString(getString(R.string.dateOfJourney)) + " " + array[1];
+            SimpleDateFormat format = new SimpleDateFormat("dd-MM-yyyy HH:mm", Locale.US);
 
             this.condition[0] = new Timestamp(format.parse(condition[0]));
             this.condition[1] = new Timestamp(format.parse(condition[1]));
         } catch (Exception e) {
             e.printStackTrace();
         }
-    }
 
-    @Override
-    public View onCreateView(@NonNull LayoutInflater inflater, ViewGroup container,
-                             Bundle savedInstanceState) {
-        View rootView = inflater.inflate(R.layout.get_list, container, false);
         getUsers = rootView.findViewById(R.id.getUsers);
         getUsers.setOnClickListener(this);
         getGroups = rootView.findViewById(R.id.getGroups);
@@ -93,7 +98,7 @@ public class List extends Fragment implements View.OnClickListener {
             collectionReference
                     .whereGreaterThanOrEqualTo(getString(R.string.time), condition[0])
                     .whereLessThanOrEqualTo(getString(R.string.time), condition[1])
-                    .whereEqualTo(getString(R.string.isGroup), false)
+                    //.whereEqualTo(getString(R.string.isGroup), false)     //TODO: Find method to auto-create indexes (or find alternative storage method)
                     .get()
                     .addOnCompleteListener(new OnCompleteListener<QuerySnapshot>() {
                         @Override
@@ -112,6 +117,7 @@ public class List extends Fragment implements View.OnClickListener {
                                 }
                             } else {
                                 Toast.makeText(getActivity(), R.string.error, Toast.LENGTH_SHORT).show();
+                                task.getException().printStackTrace();
                             }
                         }
                     });
@@ -127,12 +133,15 @@ public class List extends Fragment implements View.OnClickListener {
         groupData.put("members", 1);
         for (Map<String, Object> member : memberDetails) {
 
-            if (member.get("UID").equals(MainActivity.user.getUid())) {
-                member.put("status", "approved");
-            } else {
-                member.put("status", "pending");
+            if (MainActivity.user != null) {
+
+                if (member.get("UID").equals(MainActivity.user.getUid())) {
+                    member.put("status", "approved");
+                } else {
+                    member.put("status", "pending");
+                }
+                groupData.put(member.get("UID").toString(), member);
             }
-            groupData.put(member.get("UID").toString(), member);
         }
 
         getActivity().findViewById(R.id.loadingIcon).setVisibility(View.VISIBLE);
